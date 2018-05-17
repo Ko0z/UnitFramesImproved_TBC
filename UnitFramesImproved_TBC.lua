@@ -16,6 +16,10 @@ end
 -- /dump expression
 --		expression can be any valid lua expression that results in a value. So variable names, function calls, frames or tables can all be dumped.
 
+UNITFRAMESIMPROVED_UI_COLOR = {r = .3, g = .3, b = .3}
+FLAT_TEXTURE   = [[Interface\AddOns\UnitFramesImproved_TBC\Textures\flat.tga]]
+ORIG_TEXTURE   = [[Interface\TargetingFrame\UI-StatusBar.blp]]
+
 function tokenize(str)
 	local tbl = {};
 	for v in string.gmatch(str, "[^ ]+") do
@@ -79,12 +83,14 @@ function EnableUnitFramesImproved()
 	--hooksecurefunc("PlayerFrame_ToPlayerArt", UnitFramesImproved_PlayerFrame_ToPlayerArt);
 	--hooksecurefunc("PlayerFrame_OnUpdate", UnitFramesImproved_PlayerFrame_ToPlayerArt);
 	hooksecurefunc("HealthBar_OnValueChanged", UnitFramesImproved_ColorUpdate);
+	hooksecurefunc("PlayerFrame_OnUpdate", UnitFramesImproved_ColorUpdate);
 	--HealthBar_OnValueChanged = UnitFramesImproved_ColorUpdate;
 	--hooksecurefunc("PlayerFrame_ToVehicleArt", UnitFramesImproved_PlayerFrame_ToVehicleArt);
 	
 	-- Hook TargetFrame functions
 	hooksecurefunc("TargetFrame_CheckDead", UnitFramesImproved_TargetFrame_Update);
 	hooksecurefunc("TargetFrame_Update", UnitFramesImproved_TargetFrame_Update);
+	hooksecurefunc("TargetFrame_OnUpdate", UnitFramesImproved_TargetFrame_Update);
 	--hooksecurefunc("TargetFrame_OnUpdate", UnitFramesImproved_TargetFrame_Update);
 	hooksecurefunc("TargetFrame_CheckFaction", UnitFramesImproved_TargetFrame_CheckFaction);
 	hooksecurefunc("TargetFrame_CheckClassification", UnitFramesImproved_TargetFrame_CheckClassification);
@@ -113,16 +119,34 @@ function EnableUnitFramesImproved()
 	-- Update some values
 	TextStatusBar_UpdateTextString(PlayerFrame.healthbar);
 	TextStatusBar_UpdateTextString(PlayerFrame.manabar);
+
+	-- Dark mode and flat textures
+	UnitFramesImproved_DarkMode();
+	--UnitFramesImproved_HealthBarTexture(FLAT_TEXTURE);
+
+	PlayerName:SetFont("Fonts\\FRIZQT__.TTF", 11, "OUTLINE");
+	TargetName:SetFont("Fonts\\FRIZQT__.TTF", 11, "OUTLINE");
+
+	--PlayerFrameHealthBarText:SetFont(STANDARD_TEXT_FONT, 11, 'OUTLINE');
+	--PlayerFrameManaBarText:SetFont(STANDARD_TEXT_FONT, 11, 'OUTLINE');
+	--PetFrameHealthBarText:SetFont(STANDARD_TEXT_FONT, 11, 'OUTLINE');
+	--PetFrameManaBarText:SetFont(STANDARD_TEXT_FONT, 11, 'OUTLINE');
+
 end
 
 function UnitFramesImproved_Style_TargetOfTargetFrame()
 	if not InCombatLockdown() then 
 		TargetofTargetHealthBar.lockColor = true;
+		TargetofTargetFrame.portrait:SetPoint("CENTER",20,0);
 	end
 end
 
-function UnitFramesImproved_ColorUpdate()
-	PlayerFrameHealthBar:SetStatusBarColor(UnitColor("player"));
+function UnitFramesImproved_ColorUpdate(self)
+	--if this == PlayerFrameHealthBar then
+		PlayerFrameHealthBar:SetStatusBarColor(UnitColor("player"));
+	--else
+	--	this.healthbar:SetStatusBarColor(UnitColor(this.healthbar.unit));
+	--end
 end
 
 function UnitFramesImproved_Style_PlayerFrame()
@@ -145,17 +169,24 @@ function UnitFramesImproved_Style_TargetFrame(self)
 		local classification = UnitClassification("target");
 		if (classification == "minus") then
 			TargetFrameHealthBar:SetHeight(12);
-			TargetFrameHealthBar:SetPoint("TOPLEFT",7,-41);
+			TargetFrameHealthBar:SetPoint("TOPLEFT",6,-41); -- 7
+
+			TargetFrameManaBar:SetPoint("TOPLEFT",6,-51);
+
 			TargetFrameHealthBar.TextString:SetPoint("CENTER",-50,4);
 			TargetDeadText:SetPoint("CENTER",-50,4);
-			TargetFrameNameBackground:SetPoint("TOPLEFT",7,-41);
+			--TargetFrameNameBackground:SetPoint("TOPLEFT",7,-41);
+			TargetFrameNameBackground:Hide();
 		else
 			TargetFrameHealthBar:SetHeight(29);
-			TargetFrameHealthBar:SetPoint("TOPLEFT",7,-22);
+			TargetFrameHealthBar:SetPoint("TOPLEFT",6,-22);
+
+			TargetFrameManaBar:SetPoint("TOPLEFT",6,-51);
+
 			TargetFrameHealthBar.TextString:SetPoint("CENTER",-50,6);
 			TargetDeadText:SetPoint("CENTER",-50,6);
 			TargetFrameNameBackground:Hide();
-			TargetFrameNameBackground:SetPoint("TOPLEFT",7,-22);
+			--TargetFrameNameBackground:SetPoint("TOPLEFT",7,-22);
 		end
 		
 		TargetFrameHealthBar:SetWidth(119);
@@ -365,9 +396,14 @@ end
 -- Utility functions
 function UnitColor(unit)
 	local r, g, b;
+	local sr, sg, sb = TargetFrameNameBackground:GetVertexColor();
+
 	local localizedClass, englishClass = UnitClass(unit);
 	local classColor = RAID_CLASS_COLORS[englishClass];
-	
+
+	--DEBUG MSG
+	--DEFAULT_CHAT_FRAME:AddMessage(UnitClass(unit));
+
 	if ( ( not UnitIsPlayer(unit) ) and ( ( not UnitIsConnected(unit) ) or ( UnitIsDeadOrGhost(unit) ) ) ) then
 		--Color it gray
 		r, g, b = 0.5, 0.5, 0.5;
@@ -379,16 +415,19 @@ function UnitColor(unit)
 		else
 			if ( UnitIsFriend("player", unit) ) then
 				r, g, b = 0.0, 1.0, 0.0;
+				--DEFAULT_CHAT_FRAME:AddMessage(UnitClass("I PUT GREEN"));
 			else
 				r, g, b = 1.0, 0.0, 0.0;
 			end
 		end
-	else
-		if ( classColor ) then
-			r, g, b = classColor.r, classColor.g, classColor.b;
-		else 
-			r, g, b = 0, 1, 0;
-		end
+	else -- IF NPC COLOR IT HERE!
+		--if ( classColor ) then
+		--	r, g, b = classColor.r, classColor.g, classColor.b;
+		--else 
+		--	r, g, b = 0, 1, 0;
+		--end
+
+		r, g, b = sr, sg, sb;
 	end
 	
 	return r, g, b;
@@ -447,4 +486,76 @@ function print_r (t, indent, done)
       print  (indent .. "[" .. tostring (key) .. "] => " .. tostring (value).."")
     end
   end
+end
+
+function UnitFramesImproved_DarkMode()
+	-- Dark borders UI, code from modUI
+	for _, v in pairs({
+			-- MINIMAP CLUSTER
+		--MinimapBorder,
+		--MiniMapMailBorder,
+		--MiniMapTrackingBorder,
+		--MiniMapMeetingStoneBorder,
+		--MiniMapMailBorder,
+		--MiniMapBattlefieldBorder,
+			-- UNIT & CASTBAR
+		--PlayerFrameTexture,
+		--TargetFrameTexture,
+		PetFrameTexture,
+		PartyMemberFrame1Texture,
+		PartyMemberFrame2Texture,
+		PartyMemberFrame3Texture,
+		PartyMemberFrame4Texture,
+		PartyMemberFrame1PetFrameTexture,
+		PartyMemberFrame2PetFrameTexture,
+		PartyMemberFrame3PetFrameTexture,
+		PartyMemberFrame4PetFrameTexture,
+		TargetofTargetTexture,
+		--CastingBarBorder,
+
+		--[[
+			-- MAIN MENU BAR
+		MainMenuBarTexture0,
+		MainMenuBarTexture1,
+		MainMenuBarTexture2,
+		MainMenuBarTexture3,
+		MainMenuMaxLevelBar0,
+		MainMenuMaxLevelBar1,
+		MainMenuMaxLevelBar2,
+		MainMenuMaxLevelBar3,
+		MainMenuXPBarTextureLeftCap,
+		MainMenuXPBarTextureRightCap,
+		MainMenuXPBarTextureMid,
+		BonusActionBarTexture0,
+		BonusActionBarTexture1,
+		ReputationWatchBarTexture0,
+		ReputationWatchBarTexture1,
+		ReputationWatchBarTexture2,
+		ReputationWatchBarTexture3,
+		ReputationXPBarTexture0,
+		ReputationXPBarTexture1,
+		ReputationXPBarTexture2,
+		ReputationXPBarTexture3,
+		SlidingActionBarTexture0,
+		SlidingActionBarTexture1,
+		MainMenuBarLeftEndCap,
+		MainMenuBarRightEndCap,
+		ExhaustionTick:GetNormalTexture(),
+		]]
+
+	})	do 
+		v:SetVertexColor(UNITFRAMESIMPROVED_UI_COLOR.r, UNITFRAMESIMPROVED_UI_COLOR.g, UNITFRAMESIMPROVED_UI_COLOR.b)
+	end
+end
+
+function UnitFramesImproved_HealthBarTexture(NAME_TEXTURE)
+	PlayerFrameHealthBar:SetStatusBarTexture(NAME_TEXTURE)
+	PlayerFrameManaBar:SetStatusBarTexture(NAME_TEXTURE)
+	TargetFrameHealthBar:SetStatusBarTexture(NAME_TEXTURE)
+	TargetFrameManaBar:SetStatusBarTexture(NAME_TEXTURE)
+	PetFrameHealthBar:SetStatusBarTexture(NAME_TEXTURE)
+	PetFrameManaBar:SetStatusBarTexture(NAME_TEXTURE)
+	TargetofTargetHealthBar:SetStatusBarTexture(NAME_TEXTURE)
+	TargetofTargetManaBar:SetStatusBarTexture(NAME_TEXTURE)
+	--Add party frames
 end
