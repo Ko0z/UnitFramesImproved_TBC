@@ -4,7 +4,7 @@
 <b>This is a simplistic unitframes addon with some QoL improvements.</b>
 Please report any issue you might find to the "Issues" tracker.
 
-<a href="https://imgur.com/IsNrirA"><img src="https://i.imgur.com/IsNrirA.png" title="source: imgur.com" /></a>
+<a href="https://imgur.com/RPEg1St"><img src="https://i.imgur.com/RPEg1St.png" title="source: imgur.com" /></a>
 
 This addon is currently in beta and I'll implement more features as I go.
 
